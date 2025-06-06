@@ -11,8 +11,19 @@ from torchrl.modules import ProbabilisticActor, ValueOperator, TanhNormal
 from torchrl.objectives import ClipPPOLoss
 from torchrl.objectives.value import GAE
 import os
+from torch import multiprocessing
 
-env = GymEnv("Pendulum-v1") 
+
+is_fork = multiprocessing.get_start_method() == "fork"
+device = (
+    torch.device(0) if torch.cuda.is_available() and not is_fork
+    else torch.device('mps') if torch.backends.mps.is_available()
+    else torch.device("cpu")
+)
+
+torch.manual_seed(22)
+env = GymEnv("Pendulum-v1", device=device) 
+env.set_seed(22)
 model = TensorDictModule(
         nn.Sequential(
             nn.Linear(3, 128), nn.Tanh(),
@@ -35,13 +46,16 @@ critic = ValueOperator(
         in_keys=["observation"],
         )
 
-model_name = 'model.pt'
-critic_name = 'critic.pt'
+model_name = 'model_cuda.pt'
+critic_name = 'critic_cuda.pt'
 
 if os.path.isfile(model_name):
     model.load_state_dict(torch.load(model_name))
 if os.path.isfile(critic_name):
     critic.load_state_dict(torch.load(critic_name))
+
+model = model.to(device)
+critic = critic.to(device)
 
 actor = ProbabilisticActor(
         model,
@@ -60,9 +74,11 @@ collector = SyncDataCollector(
         actor,
         frames_per_batch=1000,
         total_frames=1_000_000,
+        device=device,
         )
+
 loss_fn = ClipPPOLoss(actor, critic)
-adv_fn = GAE(value_network=critic, average_gae=True, gamma=0.99, lmbda=0.95)
+adv_fn = GAE(value_network=critic, average_gae=True, gamma=0.99, lmbda=0.95, device=device)
 optim = torch.optim.Adam(loss_fn.parameters(), lr=2e-4)
 
 for data in collector:  # collect data
@@ -70,7 +86,7 @@ for data in collector:  # collect data
         adv_fn(data)  # compute advantage
         buffer.extend(data)
         for sample in buffer:  # consume data
-            loss_vals = loss_fn(sample)
+            loss_vals = loss_fn(sample.to(device))
             loss_val = sum(
                     value for key, value in loss_vals.items() if
                     key.startswith("loss")
@@ -88,13 +104,12 @@ from torchrl.record import CSVLogger, VideoRecorder
 from torchrl.envs import TransformedEnv
 
 path = "./training_loop_ppo"
-logger = CSVLogger(exp_name="dqn", log_dir=path, video_format="mp4")
+logger = CSVLogger(exp_name="PPO", log_dir=path, video_format="mp4")
 video_recorder = VideoRecorder(logger, tag="video")
 record_env = TransformedEnv(
         GymEnv("Pendulum-v1", from_pixels=True, pixels_only=False),
         video_recorder
         )
 
-record_env.rollout(max_steps=2000, policy=actor)
+record_env.rollout(max_steps=2000, policy=actor.to('cpu'))
 video_recorder.dump()
-

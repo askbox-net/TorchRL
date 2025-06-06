@@ -33,8 +33,8 @@ model = TensorDictModule(
             NormalParamExtractor()
             ),
         in_keys=["observation"],
-        out_keys=["loc", "scale"]
-        )
+        out_keys=["loc", "scale"],
+        ).to(device)
 
 critic = ValueOperator(
         nn.Sequential(
@@ -44,18 +44,15 @@ critic = ValueOperator(
             nn.Linear(128, 1),
             ),
         in_keys=["observation"],
-        )
+        ).to(device)
 
-model_name = 'model_cuda.pt'
-critic_name = 'critic_cuda.pt'
+model_filename = 'model.pt'
+critic_filename = 'critic.pt'
 
-if os.path.isfile(model_name):
-    model.load_state_dict(torch.load(model_name))
-if os.path.isfile(critic_name):
-    critic.load_state_dict(torch.load(critic_name))
-
-model = model.to(device)
-critic = critic.to(device)
+if os.path.isfile(model_filename):
+    model.load_state_dict(torch.load(model_filename))
+if os.path.isfile(critic_filename):
+    critic.load_state_dict(torch.load(critic_filename))
 
 actor = ProbabilisticActor(
         model,
@@ -74,7 +71,6 @@ collector = SyncDataCollector(
         actor,
         frames_per_batch=1000,
         total_frames=1_000_000,
-        device=device,
         )
 
 loss_fn = ClipPPOLoss(actor, critic)
@@ -96,8 +92,8 @@ for data in collector:  # collect data
             optim.zero_grad()
     print(f"avg reward: {data['next', 'reward'].mean().item(): 4.4f}")
 
-torch.save(model.state_dict(), model_name)
-torch.save(critic.state_dict(), critic_name)
+torch.save(model.state_dict(), model_filename)
+torch.save(critic.state_dict(), critic_filename)
 
 #from torchrl._utils import logger as torchrl_logger
 from torchrl.record import CSVLogger, VideoRecorder

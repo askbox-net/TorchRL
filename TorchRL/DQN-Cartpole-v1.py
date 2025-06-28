@@ -164,6 +164,6 @@ torchrl_logger.info(
 # Finally, we run the environment for as many steps as we can and save the
 # video locally (notice that we are not exploring).
 
-record_env.rollout(max_steps=1000, policy=policy.to('cpu'))
+record_env.rollout(max_steps=2000, policy=policy.to('cpu'))
 video_recorder.dump()
 

@@ -4,7 +4,7 @@ import time
 from collections import namedtuple
 from pprint import pprint
 
-import gym
+import gymnasium as gym
 import numpy as np
 import torch as pt
 import torch.distributions as dist
@@ -73,7 +73,7 @@ class Agent():
 
     def explore(self):
         episodes = []
-        state = self.first_state()
+        state, _ = self.first_state()
         state = pt.from_numpy(state).float()
         while True:
             # SA...
@@ -83,7 +83,7 @@ class Agent():
             entropy = distr.entropy().mean() # with grads
             
             # RS'...
-            next_state, reward, is_done, _ = self.env.step(action.item())
+            next_state, reward, is_done, _, _ = self.env.step(action.item())
             # V
             next_state = pt.from_numpy(next_state).float()
             _, next_value = self.net.forward(next_state) # next_value with grads
@@ -102,7 +102,7 @@ class Agent():
                 yield episodes
                 self.distr = distr
                 episodes = []
-                state = self.first_state()
+                state, _ = self.first_state()
                 state = pt.from_numpy(state).float()
             state = next_state
 
@@ -238,7 +238,7 @@ if __name__ == "__main__":
                                 n_actions=env.action_space.n,
                                 hidden_size=HIDDEN_SIZE,
                                     )
-    model_name = ''
+    model_name = 'actor_critic.pt'
     if os.path.exists(model_name):
         actor_critic.load_state_dict(pt.load(model_name))
     actor_critic = actor_critic.float()

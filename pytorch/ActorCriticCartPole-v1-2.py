@@ -136,7 +136,7 @@ def train_actor_critic(env_name='CartPole-v1', gamma=0.99, lr=0.001, n_episodes=
             action, log_prob = model.act(state)
 
             # 環境を1ステップ進める
-            next_state, reward, done, _, _ = env.step(action)
+            next_state, reward, terminated, truncated, _ = env.step(action)
 
             # 状態価値を取得
             state_tensor = torch.FloatTensor(state).to(device)
@@ -149,6 +149,7 @@ def train_actor_critic(env_name='CartPole-v1', gamma=0.99, lr=0.001, n_episodes=
 
             episode_reward += reward
             state = next_state
+            done = terminated | truncated
 
         episode_rewards.append(episode_reward)
 
